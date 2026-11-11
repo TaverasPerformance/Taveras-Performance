@@ -1,13 +1,214 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101014"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><title>Taveras Performance</title><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><style>
 :root{font-family:system-ui,-apple-system,sans-serif;color:#f5f5f6;background:#101014}*{box-sizing:border-box}body{margin:0}header{padding:25px 18px 18px;background:#19191f;border-bottom:2px solid #d22d3a}h1{font-size:24px;letter-spacing:.07em;margin:0}h2{font-size:19px;margin:0 0 14px}p{color:#b9b9c1}small{color:#aaa}main{max-width:760px;margin:auto;padding:16px 16px 85px}.sub{color:#d8a1a6;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:6px}.tabs{display:flex;gap:7px;margin:15px 0;overflow-x:auto}.tabs button{white-space:nowrap}.panel{background:#1b1b22;border:1px solid #34343d;border-radius:16px;padding:16px;margin-bottom:15px}.muted{color:#a7a7b0}.row{display:flex;gap:9px;align-items:center;justify-content:space-between;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{background:#26262e;border-radius:12px;padding:14px}.stat strong{font-size:23px;display:block;color:#fff;margin-top:6px}.stat span{font-size:12px;color:#bbb}button,select,input{font:inherit}button{background:#30303a;border:1px solid #484853;color:#fff;border-radius:10px;padding:10px 13px;cursor:pointer}button.active,.primary{background:#c52939;border-color:#c52939}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #ff7d8a}input,select{background:#26262e;color:white;border:1px solid #555560;border-radius:9px;padding:11px;width:100%;min-width:0}label{display:block;color:#ddd;font-size:13px;margin-bottom:5px}.field{margin:10px 0}.entry{padding:11px 0;border-bottom:1px solid #34343d}.entry:last-child{border:0}.entry b{display:block;margin-bottom:5px}.hint{font-size:12px;color:#a8a8b2}.hidden{display:none}.bars{display:flex;align-items:end;gap:8px;height:120px;border-bottom:1px solid #555;padding:10px 0}.bar{background:#d22d3a;flex:1;min-height:3px;border-radius:4px 4px 0 0}.barlabels{display:flex;gap:8px}.barlabels span{flex:1;font-size:10px;text-align:center;color:#aaa;overflow:hidden}.notice{background:#2d2328;border-left:3px solid #e84a58;padding:12px;border-radius:8px;color:#e6d4d7;font-size:13px}footer{text-align:center;font-size:12px;color:#888;padding:15px}input[type=date]{color-scheme:dark}@media(min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}}
-</style></head><body><header><div style="max-width:760px;margin:auto"><h1>TAVERAS <span style="color:#ed3b4e">PERFORMANCE</span></h1><div class="sub">Strength · Speed · Power · Baseball</div></div></header><main><div class="row"><div><label for="athlete">Athlete profile</label><select id="athlete"><option value="sr">Phil Sr.</option><option value="jr">Phil Jr.</option></select></div><div><label for="day">Training day</label><select id="day"></select></div></div><nav class="tabs"><button data-tab="today" class="active">Today's Plan</button><button data-tab="log">Log Results</button><button data-tab="progress">Progress</button><button data-tab="history">History & Backup</button></nav><section id="today"></section><section id="log" class="hidden"></section><section id="progress" class="hidden"></section><section id="history" class="hidden"></section><footer>Taveras Performance · Version 1.0 · Local-first prototype</footer></main><script>
+
+.plan-date{max-width:13rem;margin:16px 0 4px}
+.plan-entry{padding:13px 0}
+.plan-entry:last-child{border-bottom:0}
+.plan-entry summary{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;cursor:pointer;list-style:none}
+.plan-entry summary::-webkit-details-marker{display:none}
+.plan-entry summary:focus-visible{outline:2px solid #ff7d8a;outline-offset:3px}
+.plan-entry[open] .plan-action{color:#fff;background:#393941}
+.plan-action{flex-shrink:0;color:#ffb1b8;background:#3a2329;border-radius:8px;padding:7px 9px;font-size:13px;font-weight:600}
+.plan-entry-title{display:block;font-weight:600}
+.plan-target,.plan-status{display:block;margin-top:4px;font-size:13px;color:#b9b9c1}
+.plan-status{min-height:1.25em}
+.plan-form .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.plan-form button{min-height:44px}
+.plan-form button:disabled{opacity:.6;cursor:default}
+</style></head><body><header><div style="max-width:760px;margin:auto"><h1>TAVERAS <span style="color:#ed3b4e">PERFORMANCE</span></h1><div class="sub">Strength · Speed · Power · Baseball</div></div></header><main><div class="row"><div><label for="athlete">Athlete profile</label><select id="athlete"><option value="sr">Phil Sr.</option><option value="jr">Phil Jr.</option></select></div><div><label for="day">Training day</label><select id="day"></select></div></div><nav class="tabs"><button data-tab="today" class="active">Today's Plan</button><button data-tab="log">Log Results</button><button data-tab="progress">Progress</button><button data-tab="history">History & Backup</button></nav><section id="today"></section><section id="log" class="hidden"></section><section id="progress" class="hidden"></section><section id="history" class="hidden"></section><footer>Taveras Performance · Version 1.1</footer></main><script>
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const plans={sr:{Monday:{title:'Upper Push + Power',items:['Explosive push-ups · 3 × 4–5','DB bench press · 3 × 6–8','DB shoulder press · 2 × 8–10','Lateral raises · 2 × 12–15','Overhead triceps extensions · 2 × 10–12']},Tuesday:{title:'Pull Strength + Muscle',items:['Pull-ups · 3 × 6–10','Barbell bent-over rows · 3 × 6–8','One-arm DB rows · 2 × 10','Hammer curls · 2 × 10–12','DB reverse fly · 2 × 12–15']},Wednesday:{title:'Lower Power + Strength',items:['Bodyweight/light squat jumps · 3 × 4–5','Back squats · 3 sets','Bulgarian split squats · 2–3 sets','Standing calf raises · 2–3 sets']},Thursday:{title:'Upper + Rotational Power',items:['Rotational medicine ball throws · 3 × 4/side','Incline DB press · 3 × 8','Pull-ups or inverted rows · 3 × 6–10','Lateral raises · 2 × 12','DB curls · 2 × 10']},Friday:{title:'Lower + Posterior Chain',items:['Broad jumps · 3 × 3','Romanian deadlifts (pain-free only) · 3 × 6–8','Lying hamstring curls · 3 × 10–12','Weighted glute bridges · 2 × 10–12','Planks · 2 × 30–40 sec']}},jr:{Monday:{title:'Strength + Hitting',items:['Lower-body strength · coach-approved sets','Hitting practice · record swings','Fielding reps · record total']},Tuesday:{title:'Upper Body + Throwing',items:['Upper-body strength · coach-approved sets','Throwing program · record distance/intensity','Hitting practice · record swings']},Wednesday:{title:'Speed + Conditioning',items:['Dynamic warm-up','10–15 min sprint mechanics and acceleration','Conditioning · coach-directed']},Thursday:{title:'Strength + Fielding',items:['Lower-body strength · coach-approved sets','Fielding practice · record reps','Hitting practice · record swings']},Friday:{title:'Hitting + Speed',items:['Hitting lab · record swings','10–15 min speed mechanics','Mobility and recovery']}}};
-const speed=['Wednesday','Friday'];const athlete=document.getElementById('athlete'),day=document.getElementById('day');const todayName=new Date().toLocaleDateString('en-US',{weekday:'long'});DAYS.forEach(d=>day.add(new Option(d,d)));day.value=DAYS.includes(todayName)?todayName:'Monday';const key='taveras-performance-v1';let records=[];try{const raw=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(raw))records=raw}catch{}let tab='today';const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const fmt=n=>Number.isFinite(+n)?Number(n).toLocaleString():n;function save(){localStorage.setItem(key,JSON.stringify(records))}function activeRecords(){return records.filter(r=>r.athlete===athlete.value)}function render(){document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));['today','log','progress','history'].forEach(t=>$(t).classList.toggle('hidden',t!==tab));const p=plans[athlete.value][day.value];$('today').innerHTML=`<div class="panel"><h2>${esc(day.value)} · ${esc(p.title)}</h2><p>Strength/power: up to 30 min. ${speed.includes(day.value)?'Speed: 10–15 min extra. ':''}Arm care: 5–8 min extra.</p>${p.items.map(x=>`<div class="entry">✓ ${esc(x)}</div>`).join('')}${speed.includes(day.value)?'<div class="entry"><b>Speed session</b>Warm-up, acceleration drills, and short sprints with full recovery. Stop if mechanics decline.</div>':''}<div class="entry"><b>Daily arm care</b>J-bands, scapular control, shoulder mobility, and gentle rotator-cuff exercises. Avoid aggressive throwing every day.</div></div><div class="notice">Plans are starting templates. Phil Jr.’s workload should follow his coaches’ guidance, age-appropriate technique, recovery, and any medical restrictions. Keep explosive jumps light.</div>`;
-$('log').innerHTML=`<div class="panel"><h2>Record a result</h2><form id="resultForm"><div class="field"><label>Date</label><input id="date" type="date" required value="${new Date().toLocaleDateString('en-CA')}"></div><div class="field"><label>Metric / exercise</label><select id="metric"><option>Back squat</option><option>DB bench press</option><option>Bulgarian split squat</option><option>Calf raise</option><option>Pull-ups</option><option>Deadlift / RDL</option><option>10-yard sprint</option><option>30-yard sprint</option><option>60-yard sprint</option><option>Pitching velocity</option><option>Throwing velocity</option><option>Exit velocity</option><option>Hitting reps</option><option>Fielding reps</option><option>Arm care completed</option><option>Workout completed</option><option>Body weight</option><option>Other</option></select></div><div class="field"><label>Value (weight, time, mph, reps, or 1 for completed)</label><input id="value" type="number" step="any" min="0" required placeholder="e.g. 185"></div><div class="field"><label>Sets (optional)</label><input id="sets" type="number" min="0" placeholder="e.g. 3"></div><div class="field"><label>Reps per set (optional)</label><input id="reps" type="number" min="0" placeholder="e.g. 10"></div><div class="field"><label>Notes (optional)</label><input id="notes" maxlength="250" placeholder="How did it feel?"></div><button class="primary" type="submit">Save result</button></form></div>`;
+const speed = ['Wednesday', 'Friday'];
+const athlete = document.getElementById('athlete');
+const day = document.getElementById('day');
+const todayName = new Date().toLocaleDateString('en-US', {weekday: 'long'});
+DAYS.forEach(d => day.add(new Option(d, d)));
+day.value = DAYS.includes(todayName) ? todayName : 'Monday';
+
+const key = 'taveras-performance-v1';
+let records = readRecords();
+let tab = 'today';
+let planDate = localDate();
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number.isFinite(+n) ? Number(n).toLocaleString() : n;
+
+function localDate() {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const dayOfMonth = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${dayOfMonth}`;
+}
+
+function readRecords() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function save() {
+  localStorage.setItem(key, JSON.stringify(records));
+}
+
+function addResult(result) {
+  const next = [...readRecords(), {
+    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random(),
+    athlete: athlete.value,
+    ...result,
+  }];
+  localStorage.setItem(key, JSON.stringify(next));
+  records = next;
+}
+
+function activeRecords() {
+  return records.filter(r => r.athlete === athlete.value);
+}
+
+// Match existing metric names so earlier entries and new sets share a trend.
+const planMetrics = {
+  'Back squats': {metric: 'Back squat'},
+  'Bulgarian split squats': {metric: 'Bulgarian split squat'},
+  'Standing calf raises': {metric: 'Calf raise'},
+  'Romanian deadlifts (pain-free only)': {metric: 'Deadlift / RDL'},
+  'Explosive push-ups': {unit: 'reps'},
+  'Bodyweight/light squat jumps': {unit: 'reps'},
+  'Rotational medicine ball throws': {unit: 'reps'},
+  'Broad jumps': {unit: 'reps'},
+  'Planks': {unit: 'sec'},
+  'Hitting practice': {metric: 'Hitting reps', unit: 'reps', total: true},
+  'Hitting lab': {metric: 'Hitting reps', unit: 'reps', total: true},
+  'Fielding reps': {unit: 'reps', total: true},
+  'Fielding practice': {metric: 'Fielding reps', unit: 'reps', total: true},
+  'Daily arm care': {metric: 'Arm care completed', unit: 'done'},
+  'Speed session': {unit: 'done'},
+  'Dynamic warm-up': {unit: 'done'},
+  'Throwing program': {unit: 'done'},
+  '10–15 min sprint mechanics and acceleration': {unit: 'done'},
+  'Conditioning': {unit: 'done'},
+  '10–15 min speed mechanics': {unit: 'done'},
+  'Mobility and recovery': {unit: 'done'},
+};
+
+function planExercises() {
+  const items = plans[athlete.value][day.value].items.map(item => item.split(' · '));
+  if (speed.includes(day.value)) {
+    items.push(['Speed session', 'Warm-up, acceleration drills, and short sprints with full recovery. Stop if mechanics decline.']);
+  }
+  items.push(['Daily arm care', 'J-bands, scapular control, shoulder mobility, and gentle rotator-cuff exercises. Avoid aggressive throwing every day.']);
+  return items.map(([name, target]) => ({
+    name, target, metric: name, unit: 'lb', total: false, ...planMetrics[name],
+  }));
+}
+
+function resultValue(result) {
+  if (result.unit === 'done') return 'Completed';
+  if (result.unit === 'lb' && result.value === 0) return 'Bodyweight';
+  return [fmt(result.value), result.unit].filter(Boolean).join(' ');
+}
+
+function updatePlanStatus(form, exercise, saved = false) {
+  const entries = activeRecords().filter(r => r.date === planDate && r.metric === exercise.metric);
+  const last = entries[entries.length - 1];
+  form.querySelector('.plan-status').textContent = last
+    ? `${saved ? 'Saved. ' : ''}${exercise.unit === 'done' ? 'Completed' : `Last logged: ${resultValue(last)}${last.reps ? ` × ${last.reps} reps` : ''}`}`
+    : '';
+  if (exercise.unit === 'done') {
+    form.querySelector('button').disabled = Boolean(last);
+  }
+}
+
+function renderPlanExercise(exercise, index) {
+  const {name, target, unit, total} = exercise;
+  const weighted = unit === 'lb';
+  const completed = unit === 'done';
+  const action = completed ? 'Mark done' : total ? 'Save reps' : 'Save set';
+  const valueLabel = weighted ? 'Weight (lb)' : unit === 'sec' ? 'Seconds' : total ? 'Total reps' : 'Reps';
+  const fields = completed ? '' : `
+    <div class="grid">
+      <div class="field">
+        <label for="plan-value-${index}">${valueLabel}</label>
+        <input id="plan-value-${index}" name="value" type="number" inputmode="${weighted || unit === 'sec' ? 'decimal' : 'numeric'}"
+          min="${weighted ? '0' : unit === 'sec' ? '0.01' : '1'}" step="${weighted || unit === 'sec' ? 'any' : '1'}" ${weighted ? 'placeholder="0 for bodyweight"' : 'required'}>
+      </div>
+      ${weighted ? `<div class="field">
+        <label for="plan-reps-${index}">Reps</label>
+        <input id="plan-reps-${index}" name="reps" type="number" inputmode="numeric" min="1" step="1" required>
+      </div>` : ''}
+    </div>`;
+  return `<details class="entry plan-entry">
+    <summary><span><span class="plan-entry-title">${esc(name)}</span>
+      ${target ? `<span class="plan-target">${esc(target)}</span>` : ''}</span>
+      <span class="plan-action">${completed ? 'Log' : total ? 'Log reps' : 'Log set'}</span>
+    </summary>
+    <form class="plan-form">${fields}
+      <button class="primary" type="submit">${action}</button>
+      <div class="plan-status" role="status"></div>
+    </form>
+  </details>`;
+}
+
+function renderToday() {
+  const plan = plans[athlete.value][day.value];
+  const exercises = planExercises();
+  $('today').innerHTML = `<div class="panel">
+    <h2>${esc(day.value)} · ${esc(plan.title)}</h2>
+    <p>Strength/power: up to 30 min. ${speed.includes(day.value) ? 'Speed: 10–15 min extra. ' : ''}Arm care: 5–8 min extra.</p>
+    <div class="plan-date"><label for="plan-date">Workout date</label>
+      <input id="plan-date" type="date" required value="${esc(planDate)}">
+    </div>
+    ${exercises.map(renderPlanExercise).join('')}
+    </div><div class="notice">Plans are starting templates. Phil Jr.’s workload should follow his coaches’ guidance, age-appropriate technique, recovery, and any medical restrictions. Keep explosive jumps light.</div>`;
+  const dateInput = $('plan-date');
+  const forms = $('today').querySelectorAll('.plan-form');
+  dateInput.addEventListener('change', () => {
+    if (!dateInput.checkValidity()) return;
+    planDate = dateInput.value;
+    forms.forEach((form, index) => updatePlanStatus(form, exercises[index]));
+  });
+  forms.forEach((form, index) => {
+    const exercise = exercises[index];
+    const {metric, unit, total} = exercise;
+    updatePlanStatus(form, exercise);
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      if (!dateInput.reportValidity()) return;
+      planDate = dateInput.value;
+      const completed = unit === 'done';
+      const valueInput = form.elements.namedItem('value');
+      const repsInput = form.elements.namedItem('reps');
+      try {
+        addResult({
+          date: planDate,
+          metric,
+          unit,
+          value: completed ? 1 : Number(valueInput.value),
+          sets: completed || total ? '' : '1',
+          reps: repsInput?.value || '',
+          notes: '',
+        });
+      } catch {
+        form.querySelector('.plan-status').textContent = 'Could not save. Check your browser storage and try again.';
+        return;
+      }
+      updatePlanStatus(form, exercise, true);
+      // Keep the weight available for the next set.
+      if (repsInput) repsInput.value = '';
+      else if (valueInput) valueInput.value = '';
+    });
+  });
+}
+
+function render() {
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['today', 'log', 'progress', 'history'].forEach(t => $(t).classList.toggle('hidden', t !== tab));
+  if (tab === 'today') renderToday();
+$('log').innerHTML=`<div class="panel"><h2>Record a result</h2><form id="resultForm"><div class="field"><label>Date</label><input id="date" type="date" required value="${localDate()}"></div><div class="field"><label>Metric / exercise</label><select id="metric"><option>Back squat</option><option>DB bench press</option><option>Bulgarian split squat</option><option>Calf raise</option><option>Pull-ups</option><option>Deadlift / RDL</option><option>10-yard sprint</option><option>30-yard sprint</option><option>60-yard sprint</option><option>Pitching velocity</option><option>Throwing velocity</option><option>Exit velocity</option><option>Hitting reps</option><option>Fielding reps</option><option>Arm care completed</option><option>Workout completed</option><option>Body weight</option><option>Other</option></select></div><div class="field"><label>Value (weight, time, mph, reps, or 1 for completed)</label><input id="value" type="number" step="any" min="0" required placeholder="e.g. 185"></div><div class="field"><label>Sets (optional)</label><input id="sets" type="number" min="0" placeholder="e.g. 3"></div><div class="field"><label>Reps per set (optional)</label><input id="reps" type="number" min="0" placeholder="e.g. 10"></div><div class="field"><label>Notes (optional)</label><input id="notes" maxlength="250" placeholder="How did it feel?"></div><button class="primary" type="submit">Save result</button></form></div>`;
 const own=activeRecords();const latest=own.slice().sort((a,b)=>b.date.localeCompare(a.date));const metrics=[...new Set(own.map(r=>r.metric))];$('progress').innerHTML=`<div class="panel"><h2>${athlete.value==='sr'?'Phil Sr.':'Phil Jr.'} · Progress</h2><div class="grid"><div class="stat"><span>Logged results</span><strong>${own.length}</strong></div><div class="stat"><span>Training days logged</span><strong>${new Set(own.map(r=>r.date)).size}</strong></div><div class="stat"><span>Metrics tracked</span><strong>${metrics.length}</strong></div><div class="stat"><span>Latest entry</span><strong style="font-size:15px">${latest[0]?.date||'—'}</strong></div></div></div><div class="panel"><h2>Metric trend</h2><label for="chartMetric">Choose metric</label><select id="chartMetric">${metrics.map(m=>`<option>${esc(m)}</option>`).join('')}</select><div id="chartArea" style="margin-top:15px">${metrics.length?'':'Log a result to see progress.'}</div></div>`;
-$('history').innerHTML=`<div class="panel"><h2>History</h2>${latest.length?latest.slice(0,100).map(r=>`<div class="entry row"><div><b>${esc(r.metric)} · ${fmt(r.value)}</b><small>${esc(r.date)} ${r.sets?' · '+esc(r.sets)+' sets':''}${r.reps?' × '+esc(r.reps)+' reps':''}</small>${r.notes?`<div class="hint">${esc(r.notes)}</div>`:''}</div><button data-delete="${esc(r.id)}" aria-label="Delete result">Delete</button></div>`).join(''):'<p>No entries yet.</p>'}</div><div class="panel"><h2>Backup your data</h2><p>Data stays in this browser on this device. Export regularly; it does not sync to the other iPhone.</p><div class="row"><button id="export">Export backup (JSON)</button><label style="margin:0">Import backup<input id="import" type="file" accept="application/json,.json"></label></div><p class="hint">Import merges records by ID. Keep backups private because they contain personal training information.</p></div>`;
-if(tab==='progress'&&metrics.length)drawChart(metrics[0]);if(tab==='log')$('resultForm').addEventListener('submit',e=>{e.preventDefault();const r={id:crypto.randomUUID?crypto.randomUUID():Date.now().toString()+Math.random(),athlete:athlete.value,date:$('date').value,metric:$('metric').value,value:Number($('value').value),sets:$('sets').value,reps:$('reps').value,notes:$('notes').value};if(!r.date||!Number.isFinite(r.value))return;records.push(r);save();tab='progress';render()});if(tab==='progress'&&metrics.length)$('chartMetric').onchange=e=>drawChart(e.target.value);if(tab==='history'){document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{if(confirm('Delete this entry?')){records=records.filter(r=>r.id!==b.dataset.delete);save();render()}});$('export').onclick=()=>{const blob=new Blob([JSON.stringify({app:'Taveras Performance',version:1,records},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='taveras-performance-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('import').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const obj=JSON.parse(await file.text());if(!Array.isArray(obj.records)||obj.records.length>50000)throw Error('Invalid backup');const valid=obj.records.filter(r=>r&&typeof r.id==='string'&&['sr','jr'].includes(r.athlete)&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.metric==='string'&&r.metric.length<100&&typeof r.value==='number'&&Number.isFinite(r.value));const ids=new Set(records.map(r=>r.id));valid.forEach(r=>{if(!ids.has(r.id)){records.push({id:r.id,athlete:r.athlete,date:r.date,metric:r.metric,value:r.value,sets:String(r.sets||'').slice(0,10),reps:String(r.reps||'').slice(0,10),notes:String(r.notes||'').slice(0,250)});ids.add(r.id)}});save();render();alert('Backup imported')}catch{alert('Could not import this backup')}}}}
+$('history').innerHTML=`<div class="panel"><h2>History</h2>${latest.length?latest.slice(0,100).map(r=>`<div class="entry row"><div><b>${esc(r.metric)} · ${esc(resultValue(r))}</b><small>${esc(r.date)} ${r.sets?' · '+esc(r.sets)+(String(r.sets)==='1'?' set':' sets'):''}${r.reps?' × '+esc(r.reps)+' reps':''}</small>${r.notes?`<div class="hint">${esc(r.notes)}</div>`:''}</div><button data-delete="${esc(r.id)}" aria-label="Delete result">Delete</button></div>`).join(''):'<p>No entries yet.</p>'}</div><div class="panel"><h2>Backup your data</h2><p>Data stays in this browser on this device. Export regularly; it does not sync to the other iPhone.</p><div class="row"><button id="export">Export backup (JSON)</button><label style="margin:0">Import backup<input id="import" type="file" accept="application/json,.json"></label></div><p class="hint">Import merges records by ID. Keep backups private because they contain personal training information.</p></div>`;
+if(tab==='progress'&&metrics.length)drawChart(metrics[0]);if(tab==='log')$('resultForm').addEventListener('submit',e=>{e.preventDefault();const r={date:$('date').value,metric:$('metric').value,value:Number($('value').value),sets:$('sets').value,reps:$('reps').value,notes:$('notes').value};if(!r.date||!Number.isFinite(r.value))return;try{addResult(r)}catch{alert('Could not save this result');return}tab='progress';render()});if(tab==='progress'&&metrics.length)$('chartMetric').onchange=e=>drawChart(e.target.value);if(tab==='history'){document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{if(confirm('Delete this entry?')){records=records.filter(r=>r.id!==b.dataset.delete);save();render()}});$('export').onclick=()=>{const blob=new Blob([JSON.stringify({app:'Taveras Performance',version:1,records},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='taveras-performance-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('import').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const obj=JSON.parse(await file.text());if(!Array.isArray(obj.records)||obj.records.length>50000)throw Error('Invalid backup');const valid=obj.records.filter(r=>r&&typeof r.id==='string'&&['sr','jr'].includes(r.athlete)&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.metric==='string'&&r.metric.length<100&&typeof r.value==='number'&&Number.isFinite(r.value));const ids=new Set(records.map(r=>r.id));valid.forEach(r=>{if(!ids.has(r.id)){records.push({id:r.id,athlete:r.athlete,date:r.date,metric:r.metric,value:r.value,unit:['lb','reps','sec','done'].includes(r.unit)?r.unit:undefined,sets:String(r.sets||'').slice(0,10),reps:String(r.reps||'').slice(0,10),notes:String(r.notes||'').slice(0,250)});ids.add(r.id)}});save();render();alert('Backup imported')}catch{alert('Could not import this backup')}}}}
 function drawChart(metric){const arr=activeRecords().filter(r=>r.metric===metric).sort((a,b)=>a.date.localeCompare(b.date)).slice(-8),max=Math.max(...arr.map(r=>r.value),1);$('chartArea').innerHTML=arr.length?`<div class="bars">${arr.map(r=>`<div class="bar" title="${esc(r.date)}: ${esc(r.value)}" style="height:${Math.max(3,r.value/max*100)}%"></div>`).join('')}</div><div class="barlabels">${arr.map(r=>`<span>${esc(r.date.slice(5))}</span>`).join('')}</div><p class="hint">${esc(metric)} · ${arr.length} most recent entries. For sprint times, lower is better.</p>`:'<p>No data.</p>'}
 athlete.onchange=render;day.onchange=render;document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});render();if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script></body></html>

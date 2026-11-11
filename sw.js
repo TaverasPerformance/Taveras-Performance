@@ -1,1 +1,19 @@
-const CACHE='taveras-performance-v1';self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html','./manifest.webmanifest','./icon.svg']))));self.addEventListener('fetch',e=>{if(e.request.method==='GET'&&new URL(e.request.url).origin===self.location.origin)e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});
+const cacheName = 'taveras-performance-v2';
+const assets = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(assets)));
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.delete('taveras-performance-v1'));
+});
+
+self.addEventListener('fetch', event => {
+  const {request} = event;
+  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+  event.respondWith(fetch(request).catch(async () => {
+    const cache = await caches.open(cacheName);
+    return (await cache.match(request)) ?? (request.mode === 'navigate' ? cache.match('./index.html') : Response.error());
+  }));
+});
