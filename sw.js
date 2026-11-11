@@ -1,4 +1,4 @@
-const cacheName = 'taveras-performance-v2';
+const cacheName = 'taveras-performance-v10';
 const assets = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', event => {
@@ -6,7 +6,7 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.delete('taveras-performance-v1'));
+  event.waitUntil(Promise.all(['taveras-performance-v1', 'taveras-performance-v2', 'taveras-performance-v3', 'taveras-performance-v4', 'taveras-performance-v5', 'taveras-performance-v6', 'taveras-performance-v7', 'taveras-performance-v8', 'taveras-performance-v9'].map(name => caches.delete(name))));
 });
 
 self.addEventListener('fetch', event => {
