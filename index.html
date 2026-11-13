@@ -38,6 +38,7 @@
 .workout-block{margin:18px 0 2px;font-size:15px;color:#ffb1b8}
 .training-week{max-width:13rem}
 .set-boxes{display:flex;flex-wrap:wrap;gap:8px;padding:0 0 8px}.set-boxes label{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 10px;border:1px solid #555560;border-radius:8px;cursor:pointer}.set-boxes input{width:18px;height:18px;margin:0;accent-color:#e84a58}
+.quick-fields{display:flex;gap:8px;margin:10px 0}.quick-fields label{flex:1;min-width:0}.quick-fields input{margin-top:5px}.set-boxes label:has(input:checked){background:#9e2635;color:#fff;border-color:#d33}
 </style></head><body><header><div style="max-width:760px;margin:auto"><h1>TAVERAS <span style="color:#ed3b4e">PERFORMANCE</span></h1><div class="sub">Strength · Speed · Power · Baseball</div></div></header><main><div class="row"><div><label for="athlete">Athlete profile</label><select id="athlete"><option value="sr">Phil Sr.</option><option value="jr">Phil Jr.</option></select></div><div><label for="day">Training day</label><select id="day"></select></div></div><nav class="tabs"><button data-tab="today" class="active">Today's Plan</button><button data-tab="log">Log Results</button><button data-tab="progress">Progress</button><button data-tab="checkin" hidden>Weight & Height</button><button data-tab="history">History & Backup</button></nav><section id="today"></section><section id="checkin" class="hidden"></section><section id="log" class="hidden"></section><section id="progress" class="hidden"></section><section id="history" class="hidden"></section><footer>Taveras Performance · Version 1.9</footer></main><script>
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const plans={sr:{Monday:{title:'Upper Push + Power',items:['Explosive push-ups · 3 × 4–5','DB bench press · 3 × 6–8','DB shoulder press · 2 × 8–10','Lateral raises · 2 × 12–15','Overhead triceps extensions · 2 × 10–12']},Tuesday:{title:'Pull Strength + Muscle',items:['Pull-ups · 3 × 6–10','Barbell bent-over rows · 3 × 6–8','One-arm DB rows · 2 × 10','Hammer curls · 2 × 10–12','DB reverse fly · 2 × 12–15']},Wednesday:{title:'Lower Power + Strength',items:['Bodyweight/light squat jumps · 3 × 4–5','Back squats · 3 sets','Bulgarian split squats · 2–3 sets','Standing calf raises · 2–3 sets']},Thursday:{title:'Upper + Rotational Power',items:['Rotational medicine ball throws · 3 × 4/side','Incline DB press · 3 × 8','Pull-ups or inverted rows · 3 × 6–10','Lateral raises · 2 × 12','DB curls · 2 × 10']},Friday:{title:'Lower + Posterior Chain',items:['Broad jumps · 3 × 3','Romanian deadlifts (pain-free only) · 3 × 6–8','Lying hamstring curls · 3 × 10–12','Weighted glute bridges · 2 × 10–12','Planks · 2 × 30–40 sec']}},jr:{Monday:{title:'Strength + Hitting',items:['Hitting practice · record swings','Fielding reps · record total']},Tuesday:{title:'Upper Body + Throwing',items:['Throwing program · record distance/intensity','Hitting practice · record swings']},Wednesday:{title:'Speed + Conditioning',items:['Dynamic warm-up','10–15 min sprint mechanics and acceleration','Conditioning · coach-directed']},Thursday:{title:'Strength + Fielding',items:['Fielding practice · record reps','Hitting practice · record swings']},Friday:{title:'Hitting + Speed',items:['Hitting lab · record swings','10–15 min speed mechanics','Mobility and recovery']}}};
@@ -1085,17 +1086,81 @@ function checkedSets(exercise) {
     return [];
   }
 }
+const sessionDays = ['Monday', 'Tuesday', 'Thursday', 'Friday'];
+function sessionId(date = planDate, dayName = day.value, phase = currentPhase().id) {
+  return JSON.stringify(['finished-workout', phase, dayName, date]);
+}
+function quickSetId(exercise, set) {
+  return JSON.stringify(['quick-set', checklistId(exercise), Number(set)]);
+}
+function writeWorkoutRecord(id, result) {
+  const next = readRecords().filter(record => record.id !== id);
+  if (result) next.push({id, athlete: 'jr', date: planDate, ...result});
+  localStorage.setItem(key, JSON.stringify(next));
+  records = next;
+}
+function quickSetRecord(exercise, set) {
+  return records.find(record => record.id === quickSetId(exercise, set));
+}
+function setIsChecked(exercise, set) {
+  const record = quickSetRecord(exercise, set);
+  return record ? record.unit !== 'status' : Boolean(checkedSets(exercise)[set]);
+}
+function quickFields(exercise) {
+  if (exercise.unit === 'lb') return [['value', 'Weight (lb)', 'any'], ['reps', exercise.target?.includes('/side') ? 'Reps per side' : 'Reps', '1']];
+  if (exercise.unit === 'lb-yd') return [['value', 'Weight (lb)', 'any'], ['distance', 'Distance (yd)', 'any']];
+  if (exercise.unit === 'sec') return [['value', 'Seconds', 'any']];
+  if (exercise.unit === 'yd') return [['value', 'Distance (yd)', 'any']];
+  return exercise.target ? [['value', exercise.target.includes('/side') ? 'Reps per side' : 'Reps', '1']] : [];
+}
+function renderQuickFields(exercise, index, count) {
+  const fields = quickFields(exercise);
+  if (!fields.length) return '';
+  const last = Array.from({length: count}, (_, set) => quickSetRecord(exercise, set))
+    .filter(record => record && !['done', 'status'].includes(record.unit)).at(-1);
+  const target = exercise.target?.match(/^\d+\s*[×x]\s*(\d+)|^(\d+)/);
+  return '<div class="quick-fields">' + fields.map(([field, label, step]) => {
+    const initial = last?.[field] ?? (label === 'Weight (lb)' ? '' : target?.[1] || target?.[2] || '');
+    return '<label>' + label + '<input data-quick-field="' + field + '" data-for="' + index +
+      '" type="number" min="' + (label === 'Weight (lb)' ? 0 : step === '1' ? 1 : 0.01) +
+      '" step="' + step + '" inputmode="' + (step === '1' ? 'numeric' : 'decimal') +
+      '" value="' + esc(initial) + '"></label>';
+  }).join('') + '</div>';
+}
+function renderWeeklySessions() {
+  const phase = currentPhase();
+  const weeks = '<label>Training week <select id="progress-week">' + phaseState.phases.map(item =>
+    '<option value="' + esc(item.id) + '"' + (item.id === phase.id ? ' selected' : '') + '>' +
+    esc(item.name) + '</option>').join('') + '</select></label>';
+  let finished = 0;
+  const rows = sessionDays.filter(dayName => phase.workouts[dayName]?.length).map(dayName => {
+    const entries = records.filter(record => record.unit === 'status' &&
+      record.id.startsWith(JSON.stringify(['finished-workout', phase.id, dayName]).slice(0, -1) + ','));
+    const session = entries.sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (session) finished++;
+    const progress = records.some(record => record.id.startsWith('["quick-set",') &&
+      record.phaseId === phase.id && record.block === dayName && record.unit !== 'status');
+    const status = session ? (session.value === 1 ? 'Complete' : 'Partial') + ' · ' +
+      esc(session.sets) + '/' + esc(session.reps) + ' sets' : progress ? 'In Progress' : 'Upcoming';
+    return '<div class="entry row"><strong>' + dayName + ' · ' +
+      (dayName === 'Monday' || dayName === 'Thursday' ? 'Lower' : 'Upper') +
+      '</strong><span>' + status + '</span></div>';
+  });
+  return '<div class="panel"><h2>Weekly Progress</h2>' + weeks + '<p><strong>' +
+    finished + ' of ' + rows.length + ' workouts finished</strong></p>' + rows.join('') + '</div>';
+}
+
 function renderSetBoxes(exercise, index) {
   if (athlete.value !== 'jr' || !exercise.phaseId) return '';
   const prescribed = exercise.target?.match(/^(\d+)\s*[×x]/);
-  const checked = checkedSets(exercise);
-  const boxes = Array.from({length: Number(prescribed?.[1] || 1)}, (_, set) => {
+  const count = Number(prescribed?.[1] || 1);
+  const boxes = Array.from({length: count}, (_, set) => {
     const label = prescribed ? 'Set ' + (set + 1) : 'Done';
     return '<label><input type="checkbox" data-exercise="' + index + '" data-set="' + set +
       '" aria-label="' + esc(exercise.name) + ', ' + label + '"' +
-      (checked[set] ? ' checked' : '') + '>' + label + '</label>';
+      (setIsChecked(exercise, set) ? ' checked' : '') + '>' + label + '</label>';
   });
-  return '<div class="set-boxes">' + boxes.join('') + '</div>';
+  return renderQuickFields(exercise, index, count) + '<div class="set-boxes">' + boxes.join('') + '</div>';
 }
 
 function renderPlanExercise(exercise, index) {
@@ -1140,7 +1205,7 @@ function renderToday() {
   const drills = rotation.drills.map(([name, target]) => ({
     name, target, metric: `Arm care: ${name}`, unit: 'done', total: false,
   }));
-  const exercises = [...workout, ...drills];
+  const exercises = [...workout.filter(exercise => athlete.value !== 'jr' || !exercise.phaseId), ...drills];
   const junior = athlete.value === 'jr';
   $('today').innerHTML = `<div class="panel">
     <h2>${junior && workout.some(exercise => exercise.phaseId) && day.value !== 'Wednesday' ? `${esc(currentPhase().name)} · Day ${['Monday','Tuesday','Thursday','Friday'].indexOf(day.value) + 1} · ` : ''}${esc(day.value)} · ${esc(plan.title)}</h2>
@@ -1157,12 +1222,12 @@ function renderToday() {
         ? `<h3 class="workout-block">${esc(exercise.block)}</h3>`
         : !exercise.phaseId && workout[index - 1]?.phaseId ? '<h3 class="workout-block">Baseball & conditioning</h3>' : '';
       const note = heading && exercise.phaseId && programNotes[exercise.phaseId]?.[day.value]?.[exercise.block];
-      return heading + (note ? `<p class="hint">${esc(note)}</p>` : '') + '<div class="set-exercise">' + renderPlanExercise(exercise, index) + renderSetBoxes(exercise, index) + '</div>';
+      return heading + (note ? `<p class="hint">${esc(note)}</p>` : '') + '<div class="set-exercise">' + (junior && exercise.phaseId ? '<div class="entry"><b>' + esc(exercise.name) + '</b><small>' + esc(exercise.target || '') + '</small>' + renderSetBoxes(exercise, index) + '</div>' : renderPlanExercise(exercise, index)) + '</div>';
     }).join('')}
     </div><div class="panel"><h2>Arm care · ${esc(rotation.title)}</h2>
     <p>Use light resistance and stop if a drill hurts.</p>
     ${drills.map((drill, index) => renderPlanExercise(drill, workout.length + index)).join('')}
-    </div>${junior ? phaseControls() : ''}<div class="notice">Plans are starting templates. Phil Jr.’s workload should follow his coaches’ guidance, age-appropriate technique, recovery, and any medical restrictions. Keep explosive jumps light.</div>`;
+    </div>${junior && workout.some(exercise => exercise.phaseId) ? '<div class="panel"><p id="session-summary" role="status"></p><button id="finish-workout" class="primary">Finish Workout</button></div>' : ''}${junior ? phaseControls() : ''}<div class="notice">Plans are starting templates. Phil Jr.’s workload should follow his coaches’ guidance, age-appropriate technique, recovery, and any medical restrictions. Keep explosive jumps light.</div>`;
   if (athlete.value === 'jr') bindPhaseControls();
   const dateInput = $('plan-date');
   const forms = $('today').querySelectorAll('.plan-form');
@@ -1171,34 +1236,55 @@ function renderToday() {
     const done = $('today').querySelectorAll('.checklist-state[data-state="Done"]').length;
     $('checklist-tally').textContent = `${done} of ${exercises.length} activities done`;
   };
-  const boxes = [...$('today').querySelectorAll('.set-boxes input')];
-  const tally = $('checklist-tally');
-  const boxTally = document.createElement('p');
-  if (boxes.length) {
-    boxTally.setAttribute('role','status');
-    tally.after(boxTally);
-    tally.hidden = true;
+  const boxes = [...$('today').querySelectorAll('.set-boxes input[type=checkbox]')];
+  const finish = $('finish-workout');
+  const summary = $('session-summary');
+  function refreshBoxes() {
+    boxes.forEach(box => { box.checked = setIsChecked(workout[box.dataset.exercise], box.dataset.set); });
+    if (!finish) return;
+    const done = boxes.filter(box => box.checked).length;
+    const session = records.find(record => record.id === sessionId());
+    finish.disabled = !done || Boolean(session && Number(session.sets) === done && Number(session.reps) === boxes.length);
+    finish.textContent = session ? (finish.disabled ? 'Workout finished' : 'Update finished workout') : 'Finish Workout';
+    summary.textContent = done + ' of ' + boxes.length + ' sets and drills done' +
+      (session ? ' · Saved as ' + (session.value === 1 ? 'Complete' : 'Partial') : '');
   }
-  const refreshBoxes = () => {
-    boxes.forEach(box => { box.checked = Boolean(checkedSets(workout[box.dataset.exercise])[box.dataset.set]); });
-    if (boxes.length) boxTally.textContent = boxes.filter(box => box.checked).length + ' of ' + boxes.length + ' workout boxes checked';
-  };
   boxes.forEach(box => box.addEventListener('change', () => {
-    if (!dateInput.reportValidity()) {
-      refreshBoxes();
-      return;
-    }
+    if (!dateInput.reportValidity()) { refreshBoxes(); return; }
     const exercise = workout[box.dataset.exercise];
-    const checked = checkedSets(exercise);
-    checked[box.dataset.set] = box.checked;
+    const fields = [...$('today').querySelectorAll('[data-for="' + box.dataset.exercise + '"]')];
+    if (box.checked && fields.some(field => !field.reportValidity())) { refreshBoxes(); return; }
+    const values = Object.fromEntries(fields.filter(field => field.value !== '').map(field => [field.dataset.quickField, Number(field.value)]));
+    const measured = fields.length && fields.every(field => field.value !== '');
+    const id = quickSetId(exercise, box.dataset.set);
+    const entry = {metric: exercise.metric, phaseId: exercise.phaseId, phaseName: exercise.phaseName, block: day.value, sets: '1'};
     try {
-      localStorage.setItem(setKey(exercise), JSON.stringify(checked));
+      writeWorkoutRecord(id, box.checked
+        ? {...entry, unit: measured ? exercise.unit : 'done', ...values, value: measured ? values.value : 1, reps: measured ? String(values.reps ?? '') : ''}
+        : checkedSets(exercise)[box.dataset.set] ? {...entry, unit: 'status', value: 0} : null);
       refreshBoxes();
     } catch {
       refreshBoxes();
-      boxTally.textContent = 'Could not save this checkmark.';
+      summary.textContent = 'Could not save this set. Try again.';
     }
   }));
+  if (finish) finish.onclick = () => {
+    if (!dateInput.reportValidity()) return;
+    const done = boxes.filter(box => box.checked).length;
+    if (!done) return;
+    const complete = done === boxes.length;
+    if (!confirm(done + ' of ' + boxes.length + ' sets and drills done. Save as ' + (complete ? 'Complete' : 'Partial') + '?')) return;
+    try {
+      writeWorkoutRecord(sessionId(), {metric: 'Finished workout', unit: 'status',
+        value: complete ? 1 : 2, sets: String(done), reps: String(boxes.length),
+        phaseId: currentPhase().id, block: day.value});
+    } catch {
+      summary.textContent = 'Could not finish this workout. Try again.';
+      return;
+    }
+    tab = 'progress';
+    render();
+  };
   refreshBoxes();
   dateInput.addEventListener('change', () => {
     if (!dateInput.checkValidity()) return;
@@ -1377,8 +1463,12 @@ function render() {
   if (tab === 'today') renderToday();
   if (tab === 'checkin') renderCheckIn();
 $('log').innerHTML=`<div class="panel"><h2>Record a result</h2><form id="resultForm"><div class="field"><label>Date</label><input id="date" type="date" required value="${localDate()}"></div><div class="field"><label>Metric / exercise</label><select id="metric"><option>Back squat</option><option>DB bench press</option><option>Bulgarian split squat</option><option>Calf raise</option><option>Pull-ups</option><option>Deadlift / RDL</option><option>10-yard sprint</option><option>30-yard sprint</option><option>60-yard sprint</option><option>Pitching velocity</option><option>Throwing velocity</option><option>Exit velocity</option>${jr ? benchmarkMetrics.map(({name}) => `<option>${name}</option>`).join('') : ''}<option>Hitting reps</option><option>Fielding reps</option><option>Arm care completed</option><option>Workout completed</option><option>Body weight</option><option>Other</option></select></div><div class="field"><label>Value (weight, time, mph, reps, or 1 for completed)</label><input id="value" type="number" step="any" min="0" required placeholder="e.g. 185"></div><div class="field"><label>Sets (optional)</label><input id="sets" type="number" min="0" placeholder="e.g. 3"></div><div class="field"><label>Reps per set (optional)</label><input id="reps" type="number" min="0" placeholder="e.g. 10"></div><div class="field"><label>Notes (optional)</label><input id="notes" maxlength="250" placeholder="How did it feel?"></div><button class="primary" type="submit">Save result</button></form></div>`;
-const own=activeRecords();const latest=own.slice().sort((a,b)=>b.date.localeCompare(a.date));const metrics=[...new Set(own.filter(r=>!jr || r.unit !== 'done').map(r=>r.metric))];$('progress').innerHTML=(jr ? renderJrProgress(own) : `<div class="panel"><h2>${athlete.value==='sr'?'Phil Sr.':'Phil Jr.'} · Progress</h2><div class="grid"><div class="stat"><span>Logged results</span><strong>${own.length}</strong></div><div class="stat"><span>Training days logged</span><strong>${new Set(own.map(r=>r.date)).size}</strong></div><div class="stat"><span>Metrics tracked</span><strong>${metrics.length}</strong></div><div class="stat"><span>Latest entry</span><strong style="font-size:15px">${latest[0]?.date||'—'}</strong></div></div></div>`) + `<div class="panel"><h2>Metric trend</h2><label for="chartMetric">Choose metric</label><select id="chartMetric">${metrics.map(m=>`<option>${esc(m)}</option>`).join('')}</select><div id="chartArea" style="margin-top:15px">${metrics.length?'':'Log a result to see progress.'}</div></div>`;
+const own=activeRecords();const latest=own.slice().sort((a,b)=>b.date.localeCompare(a.date));const metrics=[...new Set(own.filter(r=>!jr || r.unit !== 'done').map(r=>r.metric))];$('progress').innerHTML=(jr ? renderWeeklySessions() + renderJrProgress(own) : `<div class="panel"><h2>${athlete.value==='sr'?'Phil Sr.':'Phil Jr.'} · Progress</h2><div class="grid"><div class="stat"><span>Logged results</span><strong>${own.length}</strong></div><div class="stat"><span>Training days logged</span><strong>${new Set(own.map(r=>r.date)).size}</strong></div><div class="stat"><span>Metrics tracked</span><strong>${metrics.length}</strong></div><div class="stat"><span>Latest entry</span><strong style="font-size:15px">${latest[0]?.date||'—'}</strong></div></div></div>`) + `<div class="panel"><h2>Metric trend</h2><label for="chartMetric">Choose metric</label><select id="chartMetric">${metrics.map(m=>`<option>${esc(m)}</option>`).join('')}</select><div id="chartArea" style="margin-top:15px">${metrics.length?'':'Log a result to see progress.'}</div></div>`;
 $('history').innerHTML=`<div class="panel"><h2>History</h2>${latest.length?latest.slice(0,100).map(r=>`<div class="entry row"><div><b>${esc(r.metric)} · ${esc(resultValue(r))}</b><small>${esc(r.date)} ${r.sets?' · '+esc(r.sets)+(String(r.sets)==='1'?' set':' sets'):''}${r.reps?' × '+esc(r.reps)+' reps':''}${r.phaseName?' · '+esc(r.phaseName):''}${r.block?' · '+esc(r.block):''}</small>${r.notes?`<div class="hint">${esc(r.notes)}</div>`:''}</div><button data-delete="${esc(r.id)}" aria-label="Delete result">Delete</button></div>`).join(''):'<p>No entries yet.</p>'}</div><div class="panel"><h2>Backup your data</h2><p>Data stays in this browser on this device. Export regularly; it does not sync to the other iPhone.</p><div class="row"><button id="export">Export backup (JSON)</button><label style="margin:0">Import backup<input id="import" type="file" accept="application/json,.json"></label></div><p class="hint">Import merges records by ID. Keep backups private because they contain personal training information.</p></div>`;
+if ($('progress-week')) $('progress-week').onchange = event => {
+  const next = {...phaseState, activeId: event.target.value};
+  try { savePhases(next); render(); } catch { alert('Could not switch weeks.'); }
+};
 if(tab==='progress'&&metrics.length)drawChart(metrics[0]);if(tab==='log')$('resultForm').addEventListener('submit',e=>{e.preventDefault();const r={date:$('date').value,metric:$('metric').value,unit:benchmarkMetrics.find(({name})=>name===$('metric').value)?.unit,value:Number($('value').value),sets:$('sets').value,reps:$('reps').value,notes:$('notes').value};if(!r.date||!Number.isFinite(r.value))return;if(r.unit&&r.value<=0){alert('Enter a result greater than zero.');return}try{addResult(r)}catch{alert('Could not save this result');return}tab='progress';render()});if(tab==='progress'&&metrics.length)$('chartMetric').onchange=e=>drawChart(e.target.value);if(tab==='history'){document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{if(confirm('Delete this entry?')){records=records.filter(r=>r.id!==b.dataset.delete);save();render()}});$('export').onclick=()=>{const blob=new Blob([JSON.stringify({app:'Taveras Performance',version:1,records,phases:readPhases()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='taveras-performance-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('import').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const obj=JSON.parse(await file.text());if(!Array.isArray(obj.records)||obj.records.length>50000)throw Error('Invalid backup');const valid=obj.records.filter(r=>r&&typeof r.id==='string'&&['sr','jr'].includes(r.athlete)&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.metric==='string'&&r.metric.length<100&&typeof r.value==='number'&&Number.isFinite(r.value));const ids=new Set(records.map(r=>r.id));valid.forEach(r=>{if(!ids.has(r.id)){records.push({id:r.id,athlete:r.athlete,date:r.date,metric:r.metric,value:r.value,unit:['lb','reps','sec','done','in','mph','status','yd','lb-yd'].includes(r.unit)?r.unit:undefined,sets:String(r.sets||'').slice(0,10),reps:String(r.reps||'').slice(0,10),notes:String(r.notes||'').slice(0,250),phaseId:typeof r.phaseId==='string'?r.phaseId.slice(0,80):undefined,phaseName:typeof r.phaseName==='string'?r.phaseName.slice(0,48):undefined,block:typeof r.block==='string'?r.block.slice(0,100):undefined,distance:Number.isFinite(r.distance)?r.distance:undefined});ids.add(r.id)}});save();importPhases(obj.phases);render();alert('Backup imported')}catch{alert('Could not import this backup')}}}}
 function drawChart(metric){const arr=activeRecords().filter(r=>r.metric===metric).sort((a,b)=>a.date.localeCompare(b.date)).slice(-8),max=Math.max(...arr.map(r=>r.value),1);$('chartArea').innerHTML=arr.length?`<div class="bars">${arr.map(r=>`<div class="bar" title="${esc(r.date)}: ${esc(r.value)}" style="height:${Math.max(3,r.value/max*100)}%"></div>`).join('')}</div><div class="barlabels">${arr.map(r=>`<span>${esc(r.date.slice(5))}</span>`).join('')}</div><p class="hint">${esc(metric)} · ${arr.length} most recent entries. For sprint times, lower is better.</p>`:'<p>No data.</p>'}
 athlete.onchange=render;day.onchange=()=>{
